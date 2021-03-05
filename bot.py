@@ -1,15 +1,28 @@
+import logging
+import asyncio
+
 from aiogram import Bot, types
 from aiogram.dispatcher import Dispatcher
 from aiogram.utils import executor
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.contrib.middlewares.logging import LoggingMiddleware
 
 from config import TOKEN
 from pdf_creator import form_pdf
-from utils import TestStates
+from utils import BotStates
 from os import remove
+from os import path as file
+
+
+logging.basicConfig(
+    format=u'%(filename)+13s ' +
+    '[ LINE:%(lineno)-4s] %(levelname)-8s [%(asctime)s] %(message)s',
+    level=logging.DEBUG
+    )
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot, storage=MemoryStorage())
+dp.middleware.setup(LoggingMiddleware())
 
 pictures_id = {}
 
@@ -17,42 +30,49 @@ pictures_id = {}
 @dp.message_handler(commands=['start'])
 async def process_start_command(message: types.Message):
     state = dp.current_state(user=message.from_user.id)
-    pictures_id.update({message.chat.id: []})
-    await state.set_state(TestStates.all()[0])
+    await state.set_state(BotStates.all()[0])
+    pictures_id.update({message.from_user.id: []})
     await message.reply('Привет, отправь фотографии,' +
                         ' которые хочешь добавить в .pdf')
 
 
-@dp.message_handler(state=TestStates.GET_PICTURES,
+@dp.message_handler(state=BotStates.GET_PICTURES,
                     content_types=['photo'])
 async def photo_handler(message: types.Message):
     photo = message.photo.pop()
     path = str(id(photo))+'.jpg'
-    pictures_id[message.chat.id].append(path)
+    pictures_id[message.from_user.id].append(path)
     await photo.download(path)
+    await bot.send_message(
+        message.from_user.id,
+        'Фото получено, введите /2pdf если хотите конвертировать')
 
 
-@dp.message_handler(state=TestStates.GET_PICTURES, commands=['2pdf'])
+@dp.message_handler(state=BotStates.GET_PICTURES, commands=['2pdf'])
 async def send_pdf(message: types.Message):
-    user_id = message.chat.id
+    state = dp.current_state(user=message.from_user.id)
+    await state.set_state(BotStates.all()[1])
+    user_id = message.from_user.id
     paths = pictures_id[user_id]
     if paths:
         form_pdf(paths, user_id)
+        for path in paths:
+            try:
+                remove(path)
+            except FileNotFoundError:
+                print(path)
         await bot.send_document(
             message.from_user.id,
             open(f'{user_id}.pdf', 'rb')
             )
+        remove(f'{user_id}.pdf')
+    await state.reset_state()
     await bot.send_message(
         message.from_user.id,
         'Введите /start если хотите продолжить работу')
-    state = dp.current_state(user=message.from_user.id)
-    await state.reset_state()
-    remove(f'{user_id}.pdf')
-    for path in pictures_id[user_id]:
-        remove(path)
 
 
-@dp.message_handler(state=TestStates.GET_PICTURES,
+@dp.message_handler(state=BotStates.GET_PICTURES,
                     content_types=['any'])
 async def process_start_command(message: types.Message):
     await bot.send_message(
@@ -60,13 +80,12 @@ async def process_start_command(message: types.Message):
         'Отправьте фото')
 
 
-@dp.message_handler(state=TestStates.SEND_PDF,
-                    content_types=['any'])
-async def wait(message: types.Message):
+@dp.message_handler(state=BotStates.SEND_PDF, content_types=['any'])
+async def process_start_command(message: types.Message):
     pass
 
 
-@dp.message_handler()
+@dp.message_handler(content_types=['any'])
 async def process_start_command(message: types.Message):
     await bot.send_message(
         message.from_user.id,
