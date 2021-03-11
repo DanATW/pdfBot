@@ -9,4 +9,4 @@ class BotStates(Helper):
 
 
 if __name__ == '__main__':
-    print(TestStates.all())
+    print(BotStates.all())
