@@ -40,7 +40,7 @@ async def process_start_command(message: types.Message):
                     content_types=['photo'])
 async def photo_handler(message: types.Message):
     photo = message.photo.pop()
-    path = str(id(photo))+'.jpg'
+    path = str(hash(photo))+'.jpg'
     pictures_id[message.from_user.id].append(path)
     await photo.download(path)
     await bot.send_message(
@@ -57,10 +57,7 @@ async def send_pdf(message: types.Message):
     if paths:
         form_pdf(paths, user_id)
         for path in paths:
-            try:
-                remove(path)
-            except FileNotFoundError:
-                print(path)
+            remove(path)
         await bot.send_document(
             message.from_user.id,
             open(f'{user_id}.pdf', 'rb')
