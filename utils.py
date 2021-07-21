@@ -1,7 +1,7 @@
 from aiogram.utils.helper import Helper, HelperMode, ListItem
 
 
-class TestStates(Helper):
+class BotStates(Helper):
     mode = HelperMode.snake_case
 
     GET_PICTURES = ListItem()
@@ -9,4 +9,4 @@ class TestStates(Helper):
 
 
 if __name__ == '__main__':
-    print(TestStates.all())
+    print(BotStates.all())
