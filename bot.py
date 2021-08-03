@@ -10,8 +10,7 @@ from aiogram.contrib.middlewares.logging import LoggingMiddleware
 from config import TOKEN
 from pdf_creator import form_pdf
 from utils import BotStates
-from os import remove
-from os import path as file
+import os
 
 
 logging.basicConfig(
@@ -41,8 +40,8 @@ async def process_start_command(message: types.Message):
 async def photo_handler(message: types.Message):
     photo = message.photo.pop()
     path = str(hash(photo))+'.jpg'
-    pictures_id[message.from_user.id].append(path)
     await photo.download(path)
+    pictures_id[message.from_user.id].append(path)
     await bot.send_message(
         message.from_user.id,
         'Фото получено, введите /2pdf если хотите конвертировать')
@@ -57,12 +56,12 @@ async def send_pdf(message: types.Message):
     if paths:
         form_pdf(paths, user_id)
         for path in paths:
-            remove(path)
+            os.remove(path)
         await bot.send_document(
             message.from_user.id,
             open(f'{user_id}.pdf', 'rb')
             )
-        remove(f'{user_id}.pdf')
+        os.remove(f'{user_id}.pdf')
     await state.reset_state()
     await bot.send_message(
         message.from_user.id,
